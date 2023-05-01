@@ -30,3 +30,18 @@
 *.exe
 *.out
 *.app
+# hide build files
+build/
+CMakeFiles/
+/.cmake/
+/.vscode/
+/cmake-build-debug/
+/Testing/
+bd2_project
+bd2_project.cbp
+CMakeCache.txt
+log*
+Makefile
+.idea/
+/cmake_install.cmake
+/games2.dat

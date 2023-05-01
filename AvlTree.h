@@ -7,13 +7,13 @@
 
 #include <string>
 #include <fstream>
-
+#include <vector>
 
 
 struct GameRecord {
-    char user_id[10];
-    char name[85]; //primary key
-    float hours;
+    char publisher[90];
+    char gameTitle[150]; //primary key
+    float price;
 };
 
 struct GameRecordMetaData {
@@ -21,6 +21,7 @@ struct GameRecordMetaData {
     long left; //primary key
     long right;
     long height;
+    long deleted;
 };
 
 class AvlTree {
@@ -29,6 +30,8 @@ private:
     void insert(char *key, long current_pos, long pos, std::fstream &file);
     std::tuple<long, long> update_height(std::fstream &file, long current_pos);
     GameRecordMetaData get_record(long pos);
+    int insert_memory_accesses = 0;
+    int search_memory_accesses = 0;
 
 public:
     explicit AvlTree(std::string &file_name);
@@ -54,6 +57,21 @@ public:
     void print_preorder();
 
     void print_preorder(std::fstream &file, long pos, int &count);
+
+    bool delete_item(char *key);
+
+    GameRecordMetaData search_by_name(std::fstream &file, long current_pos, char *name);
+
+    std::vector<GameRecord> search_by_name_range(char *name1, char *name2);
+
+    void search_by_name_range(std::fstream &file, std::vector<GameRecord> &records, long current_pos, char *left_name,
+                              char *right_name);
+
+    GameRecord search_by_name(char *name);
+
+    void test_from_csv(const char *string, int number, char delimiter, const std::vector<int> &breaks);
+
+    void test(int line_count, std::string &file_name);
 };
 
 
