@@ -1,5 +1,5 @@
 import random
-lines = open('games.csv').readlines()
+lines = open('movies.csv').readlines()
 random.shuffle(lines)
-open('games.csv', 'w').writelines(lines)
+open('movies.csv', 'w').writelines(lines)
 
