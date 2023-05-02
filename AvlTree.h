@@ -22,16 +22,16 @@
 struct MovieRecord {
     int id;
     char primaryTitle[419];
-    char year[4];
+    char year[5];
     char genres[32];
     static constexpr long size = sizeof(id) + sizeof(primaryTitle) + sizeof(year) + sizeof(genres);
 };
 
 struct GameRecord {
-    char text[90];
-    char key[150]; //primary key
-    float number;
-    static constexpr long size = sizeof(text) + sizeof(key) + sizeof(number);
+    char publisher[90];
+    char gameTitle[150]; //primary gameTitle
+    float price;
+    static constexpr long size = sizeof(publisher) + sizeof(gameTitle) + sizeof(price);
 };
 
 static constexpr long metada_size = (3 * sizeof(long) + sizeof(int) + 1);
@@ -51,7 +51,33 @@ struct RecordMetaData {
     int deleted;
 };
 
-#include "functions.h"
+template <typename Record, typename T>
+static int compare(T a, T b) {
+    if constexpr (std::is_same<Record, GameRecord>::value) {
+        int i = 0;
+        while (a[i] != '\0' && b[i] != '\0') {
+            if (a[i] < b[i]) {
+                return 1;
+            } else if (a[i] > b[i]) {
+                return -1;
+            }
+            i++;
+        }
+        if (a[i] == '\0' && b[i] == '\0') {
+            return 1;
+        } else if (a[i] == '\0') {
+            return 1;
+        } else {
+            return -1;
+        }
+    }
+
+    if constexpr (std::is_same<Record, MovieRecord>::value) {
+        return -1*((a <= b) * -1 + (a > b) * 1);
+    }
+
+}
+
 
 template<class Record>
 class AvlTree {
@@ -86,10 +112,10 @@ public:
 
         int comparison = 0;
         if constexpr (std::is_same<Record, GameRecord>::value) {
-            comparison = Functions::compare<Record>(current.record.key, key);
+            comparison = compare<Record>(current.record.gameTitle, key);
         }
         if constexpr (std::is_same<Record, MovieRecord>::value) {
-            comparison = Functions::compare<Record>(current.record.id, key);
+            comparison = compare<Record>(current.record.id, key);
         }
 
         if (comparison == 1) {
@@ -157,15 +183,15 @@ public:
         }
         long pos = ((long) (file.tellg()) - (sizeof(long) + 1)) / (Line_size<Record>::size);
         if constexpr (std::is_same<Record, GameRecord>::value) {
-            file.write(record.text, sizeof(record.text));
-            file.write(record.key, sizeof(record.key));
-            file.write((char *) &record.number, sizeof(float));
+            file.write(record.publisher, sizeof(record.publisher));
+            file.write(record.gameTitle, sizeof(record.gameTitle));
+            file.write((char *) &record.price, sizeof(float));
         }
         if constexpr (std::is_same<Record, MovieRecord>::value) {
             file.write((char *) &record.id, sizeof(Record::id));
-            file.write(record.primaryTitle, sizeof(record.primaryTitle));
+            file.write(record.primaryTitle, sizeof(Record::primaryTitle));
             file.write(record.year, sizeof(Record::year));
-            file.write(record.genres, sizeof(record.genres));
+            file.write(record.genres, sizeof(Record::genres));
         }
 
         long trash = -1;
@@ -184,57 +210,56 @@ public:
             file.seekg(0, std::ios::beg);
             file.write((char *) &pos, sizeof(long));
             insert_memory_accesses += 2;
-
-            return true;
         } else {
             if constexpr (std::is_same<Record, GameRecord>::value) {
-                insert(record.key, header, pos, file);
+                insert(record.gameTitle, header, pos, file);
             }
             if constexpr (std::is_same<Record, MovieRecord>::value) {
                 insert(record.id, header, pos, file);
             }
         }
         file.close();
+        return true;
     }
 
-    template<typename T>
-    bool delete_item(T key) {
-        std::fstream file(file_name, std::ios::in | std::ios::out | std::ios::binary);
-        file.seekg(0, std::ios::beg);
-        long header;
-        file.read((char *) &header, sizeof(long));
-        if (header == -1) {
-            return false;
-        }
-        long current_pos = header;
-        long current_pos_parent = -1;
-        long current_pos_parent_pos = -1;
-        while (current_pos != -1) {
-            file.seekg(sizeof(Record::text), std::ios::cur);
-            char current_name[sizeof(Record::key)];
-            file.read(current_name, sizeof(current_name));
-            file.seekg(sizeof(Record::number), std::ios::cur);
-            long left;
-            long right;
-            long left_pos = file.tellg();
-            file.read((char *) &left, sizeof(long));
-            long right_pos = file.tellg();
-            file.read((char *) &right, sizeof(long));
-            int comparison = Functions::compare(current_name, key);
-            if (comparison == 1) {
-                current_pos_parent = current_pos;
-                current_pos_parent_pos = left_pos;
-                current_pos = left;
-            } else if (comparison == -1) {
-                current_pos_parent = current_pos;
-                current_pos_parent_pos = right_pos;
-                current_pos = right;
-            } else {
-                break;
-            }
-        }
-
-    }
+//    template<typename T>
+//    bool delete_item(T key) {
+//        std::fstream file(file_name, std::ios::in | std::ios::out | std::ios::binary);
+//        file.seekg(0, std::ios::beg);
+//        long header;
+//        file.read((char *) &header, sizeof(long));
+//        if (header == -1) {
+//            return false;
+//        }
+//        long current_pos = header;
+//        long current_pos_parent = -1;
+//        long current_pos_parent_pos = -1;
+//        while (current_pos != -1) {
+//            file.seekg(sizeof(Record::publisher), std::ios::cur);
+//            char current_name[sizeof(Record::gameTitle)];
+//            file.read(current_name, sizeof(current_name));
+//            file.seekg(sizeof(Record::price), std::ios::cur);
+//            long left;
+//            long right;
+//            long left_pos = file.tellg();
+//            file.read((char *) &left, sizeof(long));
+//            long right_pos = file.tellg();
+//            file.read((char *) &right, sizeof(long));
+//            int comparison = compare(current_name, key);
+//            if (comparison == 1) {
+//                current_pos_parent = current_pos;
+//                current_pos_parent_pos = left_pos;
+//                current_pos = left;
+//            } else if (comparison == -1) {
+//                current_pos_parent = current_pos;
+//                current_pos_parent_pos = right_pos;
+//                current_pos = right;
+//            } else {
+//                break;
+//            }
+//        }
+//
+//    }
 
 
     long balancing_factor(long &current_pos, std::fstream &file) {
@@ -387,8 +412,8 @@ public:
         while (true) {
             file.seekg(1, std::ios::cur);
 
-            char user_id[sizeof(Record::text)];
-            char name[sizeof(Record::key)];
+            char user_id[sizeof(Record::publisher)];
+            char name[sizeof(Record::gameTitle)];
             float hours;
             file.read(user_id, sizeof(user_id));
             file.read(name, sizeof(name));
@@ -425,8 +450,8 @@ public:
         while (true) {
             file.seekg(1, std::ios::cur);
             if constexpr (std::is_same<Record, GameRecord>::value) {
-                char user_id[sizeof(Record::text)];
-                char name[sizeof(Record::key)];
+                char user_id[sizeof(Record::publisher)];
+                char name[sizeof(Record::gameTitle)];
                 float hours;
                 file.read(user_id, sizeof(user_id));
                 file.read(name, sizeof(name));
@@ -471,16 +496,15 @@ public:
         RecordMetaData<Record> record_data{};
 
         if constexpr (std::is_same<Record, GameRecord>::value) {
-            file.read(record_data.record.text, sizeof(Record::text));
-            file.read(record_data.record.key, sizeof(Record::key));
-            file.read((char *) &record_data.record.number, sizeof(Record::number));
+            file.read(record_data.record.publisher, sizeof(GameRecord::publisher));
+            file.read(record_data.record.gameTitle, sizeof(GameRecord::gameTitle));
+            file.read((char *) &record_data.record.price, sizeof(GameRecord::price));
 
 
         } else if constexpr (std::is_same<Record, MovieRecord>::value) {
             file.read((char *) &record_data.record.id, sizeof(MovieRecord::id));
             file.read(record_data.record.primaryTitle, sizeof(MovieRecord::primaryTitle));
-            file.read((char *) record_data.record.year, sizeof(MovieRecord::year));
-
+            file.read(record_data.record.year, sizeof(MovieRecord::year));
             file.read(record_data.record.genres, sizeof(MovieRecord::genres));
 
         }
@@ -493,16 +517,16 @@ public:
         return record_data;
     }
 
-//function to load from a csv with optionial line number
+//function to load from a csv with optionial line price
 
-    void load_from_csv(std::string file_name, int line_number, char delimiter) {
+    void load_from_csv(std::string file_name, int line_price, char delimiter) {
         std::ifstream file(file_name);
         //skip first line
         std::string line;
         std::getline(file, line);
         int line_count = 0;
         while (std::getline(file, line)) {
-            if (line_count == line_number) break;
+            if (line_count == line_price) break;
             std::stringstream ss(line);
             std::string token;
             std::vector<std::string> tokens;
@@ -511,9 +535,9 @@ public:
             }
             Record record{};
             if constexpr (std::is_same<Record, GameRecord>::value) {
-                strcpy(record.text, tokens[0].c_str());
-                strcpy(record.key, tokens[1].c_str());
-                record.number = std::stof(tokens[2]);
+                strcpy(record.publisher, tokens[0].c_str());
+                strcpy(record.gameTitle, tokens[1].c_str());
+                record.price = std::stof(tokens[2]);
             }
 
             if constexpr (std::is_same<Record, MovieRecord>::value) {
@@ -550,8 +574,8 @@ public:
         count++;
         file.seekg(get_file_pos_from_pos(pos), std::ios::beg);
         if constexpr (std::is_same<Record, GameRecord>::value) {
-            char user_id[sizeof(Record::text)];
-            char name[sizeof(Record::key)];
+            char user_id[sizeof(Record::publisher)];
+            char name[sizeof(Record::gameTitle)];
             float hours;
             file.read(user_id, sizeof(user_id));
             file.read(name, sizeof(name));
@@ -579,10 +603,10 @@ public:
             char primaryTitle[sizeof(MovieRecord::primaryTitle)];
             char year[sizeof(MovieRecord::year)];
             char genres[sizeof(MovieRecord::genres)];
-            file.read((char *) &id, sizeof(id));
-            file.read(primaryTitle, sizeof(primaryTitle));
+            file.read((char *) &id, sizeof(MovieRecord::id));
+            file.read(primaryTitle, sizeof(MovieRecord::primaryTitle));
             file.read(year, sizeof(year));
-            file.read(genres, sizeof(genres));
+            file.read(genres, sizeof(MovieRecord::genres));
 
             long left, right, height;
             int deleted;
@@ -608,7 +632,7 @@ public:
     }
 
 
-    void test_from_csv(const char *string, int number, char delimiter, const std::vector<int> &breaks) {
+    void test_from_csv(const char *string, int price, char delimiter, const std::vector<int> &breaks) {
         std::cout << "n|search_time|search_memory|insert_time|insert_memory\n";
         std::ifstream file(string);
         std::string line;
@@ -616,7 +640,7 @@ public:
         bool need_test = false;
         std::getline(file, line);
         while (std::getline(file, line)) {
-            if (line_count == number) break;
+            if (line_count == price) break;
             if (std::find(breaks.begin(), breaks.end(), line_count) != breaks.end()) {
                 std::cout << line_count << "|";
                 need_test = true;
@@ -630,12 +654,13 @@ public:
             }
             Record record{};
             if constexpr (std::is_same<Record, GameRecord>::value) {
-                strcpy(record.text, tokens[0].c_str());
-                strcpy(record.key, tokens[1].c_str());
-                record.number = std::stof(tokens[2]);
+                strcpy(record.publisher, tokens[0].c_str());
+                strcpy(record.gameTitle, tokens[1].c_str());
+                record.price = std::stof(tokens[2]);
             }
 
             if constexpr (std::is_same<Record, MovieRecord>::value) {
+
                 record.id = std::stoi(tokens[0]);
                 strcpy(record.primaryTitle, tokens[1].c_str());
                 strcpy(record.year, tokens[2].c_str());
@@ -670,8 +695,8 @@ public:
             file.seekg(get_file_pos_from_pos(random_pos), std::ios::beg);
             //read game
             if constexpr (std::is_same<Record, GameRecord>::value) {
-                char user_id[sizeof(Record::text)];
-                char name[sizeof(Record::key)];
+                char user_id[sizeof(Record::publisher)];
+                char name[sizeof(Record::gameTitle)];
                 float hours;
                 file.read(user_id, sizeof(user_id));
                 file.read(name, sizeof(name));
@@ -734,32 +759,38 @@ public:
         }
         int comparison = 0;
         if constexpr (std::is_same<Record, GameRecord>::value) {
-            comparison = Functions::compare<Record, T>(current.record.key, key);
+            comparison = compare<Record, T>(current.record.gameTitle, key);
         }
         if constexpr (std::is_same<Record, MovieRecord>::value) {
-            comparison = Functions::compare<Record, T>(current.record.id, key);
+            comparison = compare<Record, T>(current.record.id, key);
         }
         int cmp2 = 0;
         if constexpr (std::is_same<Record, GameRecord>::value) {
-            cmp2 = !strcmp(current.record.key, key);
+            cmp2 = !strcmp(current.record.gameTitle, key);
+            if (cmp2) {
+                return current;
+            } else if (comparison <= 0) {
+                return search_by_name(file, current.left, key);
+            } else {
+                return search_by_name(file, current.right, key);
+            }
         }
         if constexpr (std::is_same<Record, MovieRecord>::value) {
             cmp2 = key == current.record.id;
-        }
-
-        if (cmp2) {
-            return current;
-        } else if (comparison > 0) {
-            return search_by_name(file, current.left, key);
-        } else {
-            return search_by_name(file, current.right, key);
+            if (cmp2) {
+                return current;
+            } else if (comparison <= 0) {
+                return search_by_name(file, current.left, key);
+            } else {
+                return search_by_name(file, current.right, key);
+            }
         }
     }
 
 //search by range of filne_name
-
-    std::vector<Record> search_by_name_range(char name1[Record::size],
-                                             char name2[Record::size]) {
+    template<typename T>
+    std::vector<Record> search_by_name_range(T name1,
+                                             T name2) {
         std::fstream file(file_name, std::ios::in | std::ios::binary);
         file.seekg(0, std::ios::beg);
         long header;
@@ -781,9 +812,17 @@ public:
                               T left_name,
                               T right_name) {
         auto current = get_record(current_pos);
+        int cmp_left = 0;
+        int cmp_right = 0;
+        if constexpr (std::is_same<Record, GameRecord>::value) {
+            cmp_left = compare<Record>(left_name, current.record.gameTitle);
+            cmp_right = compare<Record>(right_name, current.record.gameTitle);
+        }
+        if constexpr (std::is_same<Record, MovieRecord>::value) {
+            cmp_left = compare<Record>(left_name, current.record.id);
+            cmp_right = compare<Record>(right_name, current.record.id);
 
-        int cmp_left = Functions::compare(left_name, current.record.key);
-        int cmp_right = Functions::compare(right_name, current.record.key);
+        }
         if (cmp_left >= 0 && cmp_right <= 0) {
             records.push_back(current.record);
         }
@@ -793,6 +832,7 @@ public:
         if (current.right != -1 && cmp_right < 0) {
             search_by_name_range(file, records, current.right, left_name, right_name);
         }
+
     }
 
 };
