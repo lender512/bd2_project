@@ -18,6 +18,11 @@
 #include <cstring>
 #include <chrono>
 
+/*
+
+=PROMEDIO(Hoja1!B2; Hoja2!B2; Hoja3!B2; Hoja4!B2; Hoja5!B2; Hoja6!B2; Hoja7!B2; Hoja8!B2; Hoja9!B2; Hoja10!B2)
+
+*/
 
 struct MovieRecord {
     int id;
@@ -51,7 +56,7 @@ struct RecordMetaData {
     int deleted;
 };
 
-template <typename Record, typename T>
+template<typename Record, typename T>
 static int compare(T a, T b) {
     if constexpr (std::is_same<Record, GameRecord>::value) {
         int i = 0;
@@ -73,7 +78,7 @@ static int compare(T a, T b) {
     }
 
     if constexpr (std::is_same<Record, MovieRecord>::value) {
-        return -1*((a <= b) * -1 + (a > b) * 1);
+        return -1 * ((a <= b) * -1 + (a > b) * 1);
     }
 
 }
@@ -222,44 +227,30 @@ public:
         return true;
     }
 
-//    template<typename T>
-//    bool delete_item(T key) {
-//        std::fstream file(file_name, std::ios::in | std::ios::out | std::ios::binary);
-//        file.seekg(0, std::ios::beg);
-//        long header;
-//        file.read((char *) &header, sizeof(long));
-//        if (header == -1) {
-//            return false;
-//        }
-//        long current_pos = header;
-//        long current_pos_parent = -1;
-//        long current_pos_parent_pos = -1;
-//        while (current_pos != -1) {
-//            file.seekg(sizeof(Record::publisher), std::ios::cur);
-//            char current_name[sizeof(Record::gameTitle)];
-//            file.read(current_name, sizeof(current_name));
-//            file.seekg(sizeof(Record::price), std::ios::cur);
-//            long left;
-//            long right;
-//            long left_pos = file.tellg();
-//            file.read((char *) &left, sizeof(long));
-//            long right_pos = file.tellg();
-//            file.read((char *) &right, sizeof(long));
-//            int comparison = compare(current_name, key);
-//            if (comparison == 1) {
-//                current_pos_parent = current_pos;
-//                current_pos_parent_pos = left_pos;
-//                current_pos = left;
-//            } else if (comparison == -1) {
-//                current_pos_parent = current_pos;
-//                current_pos_parent_pos = right_pos;
-//                current_pos = right;
-//            } else {
-//                break;
-//            }
-//        }
-//
-//    }
+    template<typename T>
+    bool delete_item(T key) {
+        std::fstream file(file_name, std::ios::in | std::ios::out | std::ios::binary);
+        long header;
+        file.seekg(0, std::ios::beg);
+        file.read((char *) &header, sizeof(long));
+        file.seekg(1, std::ios::cur);
+        auto val = delete_item(key, header, file);
+        file.close();
+        return val;
+    }
+
+    template<typename T>
+    bool delete_item(T key, long &current_pos, std::fstream &file) {
+
+        auto [record, pos] = search_by_name_delete(file, current_pos, key);
+        if (record.height == -1 || record.deleted == 1) {
+            return false;
+        }
+        file.seekg(get_file_pos_from_pos(pos) + Line_size<Record>::size - sizeof(int) - 1, std::ios::beg);
+        int deleted = 1;
+        file.write((char *) &deleted, sizeof(deleted));
+        return true;
+    }
 
 
     long balancing_factor(long &current_pos, std::fstream &file) {
@@ -411,20 +402,41 @@ public:
         int count = 0;
         while (true) {
             file.seekg(1, std::ios::cur);
-
-            char user_id[sizeof(Record::publisher)];
-            char name[sizeof(Record::gameTitle)];
-            float hours;
-            file.read(user_id, sizeof(user_id));
-            file.read(name, sizeof(name));
-            file.read((char *) &hours, sizeof(float));
-            if (file.eof()) {
-                break;
+            if constexpr (std::is_same<Record, GameRecord>::value) {
+                char user_id[sizeof(Record::publisher)];
+                char name[sizeof(Record::gameTitle)];
+                float hours;
+                file.read(user_id, sizeof(user_id));
+                file.read(name, sizeof(name));
+                file.read((char *) &hours, sizeof(float));
+                if (file.eof()) {
+                    break;
+                }
+                std::cout << "Count: " << count++ << " ";
+                std::cout << "Name: " << name << " ";
+                std::cout << "User ID: " << user_id << " ";
+                std::cout << "Platform: " << hours << " ";
             }
-            std::cout << "Count: " << count++ << " ";
-            std::cout << "Name: " << name << " ";
-            std::cout << "User ID: " << user_id << " ";
-            std::cout << "Platform: " << hours << " ";
+            if constexpr (std::is_same<Record, MovieRecord>::value) {
+                int id;
+                char primaryTitle[sizeof(MovieRecord::primaryTitle)];
+                char originalYear[sizeof(MovieRecord::year)];
+                char genres[sizeof(MovieRecord::genres)];
+                file.read((char *) &id, sizeof(int));
+                file.read(primaryTitle, sizeof(primaryTitle));
+                file.read(originalYear, sizeof(originalYear));
+                file.read(genres, sizeof(genres));
+
+
+                if (file.eof()) {
+                    break;
+                }
+                std::cout << "Count: " << count++ << " ";
+                std::cout << "ID: " << id << " ";
+                std::cout << "Title: " << primaryTitle << " ";
+                std::cout << "Year: " << originalYear << " ";
+                std::cout << "Genres: " << genres << " ";
+            }
             long left, right, height;
             int deleted;
             file.read((char *) &left, sizeof(long));
@@ -438,6 +450,7 @@ public:
             max_height = std::max(max_height, height);
         }
         std::cout << "Max height: " << max_height << std::endl;
+
         file.close();
     }
 
@@ -512,6 +525,7 @@ public:
         file.read((char *) &record_data.left, sizeof(long));
         file.read((char *) &record_data.right, sizeof(long));
         file.read((char *) &record_data.height, sizeof(long));
+        file.read((char *) &record_data.deleted, sizeof(int));
         //        record_data.record = record;
         file.close();
         return record_data;
@@ -588,13 +602,16 @@ public:
             file.read((char *) &deleted, sizeof(int));
             print_preorder(file, left, count);
 
-            std::cout << "Name: " << name << " ";
-            std::cout << "User ID: " << user_id << " ";
-            std::cout << "Platform: " << hours << " ";
-            std::cout << "Left: " << left << " ";
-            std::cout << "Right: " << right << " ";
-            std::cout << "Height: " << height << " ";
-            std::cout << "Deleted: " << deleted << std::endl;
+            if (deleted != 1) {
+                std::cout << "Name: " << name << " ";
+                std::cout << "User ID: " << user_id << " ";
+                std::cout << "Platform: " << hours << " ";
+                std::cout << "Left: " << left << " ";
+                std::cout << "Right: " << right << " ";
+                std::cout << "Height: " << height << " ";
+                std::cout << "Deleted: " << deleted << std::endl;
+            }
+
 
             print_preorder(file, right, count);
         }
@@ -615,15 +632,16 @@ public:
             file.read((char *) &height, sizeof(long));
             file.read((char *) &deleted, sizeof(int));
             print_preorder(file, left, count);
-
-            std::cout << "ID: " << id << " ";
-            std::cout << "Primary Title: " << primaryTitle << " ";
-            std::cout << "Year: " << year << " ";
-            std::cout << "Genres: " << genres << " ";
-            std::cout << "Left: " << left << " ";
-            std::cout << "Right: " << right << " ";
-            std::cout << "Height: " << height << " ";
-            std::cout << "Deleted: " << deleted << std::endl;
+            if (deleted != 1) {
+                std::cout << "ID: " << id << " ";
+                std::cout << "Primary Title: " << primaryTitle << " ";
+                std::cout << "Year: " << year << " ";
+                std::cout << "Genres: " << genres << " ";
+                std::cout << "Left: " << left << " ";
+                std::cout << "Right: " << right << " ";
+                std::cout << "Height: " << height << " ";
+                std::cout << "Deleted: " << deleted << std::endl;
+            }
 
             print_preorder(file, right, count);
         }
@@ -751,6 +769,44 @@ public:
     }
 
     template<typename T>
+    std::tuple<RecordMetaData<Record>, long> search_by_name_delete(std::fstream &file, long current_pos, T key) {
+        auto current = get_record(current_pos);
+        search_memory_accesses += 8;
+        if (current.height == -1) {
+            return {current, current_pos};
+        }
+        int comparison = 0;
+        if constexpr (std::is_same<Record, GameRecord>::value) {
+            comparison = compare<Record, T>(current.record.gameTitle, key);
+        }
+        if constexpr (std::is_same<Record, MovieRecord>::value) {
+            comparison = compare<Record, T>(current.record.id, key);
+        }
+        int cmp2 = 0;
+        if constexpr (std::is_same<Record, GameRecord>::value) {
+            cmp2 = !strcmp(current.record.gameTitle, key);
+            if (cmp2) {
+                return {current, current_pos};
+            } else if (comparison <= 0) {
+                return search_by_name_delete(file, current.left, key);
+            } else {
+                return search_by_name_delete(file, current.right, key);
+            }
+        }
+        if constexpr (std::is_same<Record, MovieRecord>::value) {
+            cmp2 = key == current.record.id;
+            if (cmp2) {
+                return {current, current_pos};
+            } else if (comparison <= 0) {
+                return search_by_name_delete(file, current.left, key);
+            } else {
+                return search_by_name_delete(file, current.right, key);
+            }
+        }
+    }
+
+
+    template<typename T>
     RecordMetaData<Record> search_by_name(std::fstream &file, long current_pos, T key) {
         auto current = get_record(current_pos);
         search_memory_accesses += 8;
@@ -768,6 +824,11 @@ public:
         if constexpr (std::is_same<Record, GameRecord>::value) {
             cmp2 = !strcmp(current.record.gameTitle, key);
             if (cmp2) {
+                if (current.deleted != 0) {
+                    RecordMetaData<Record> trash{};
+                    trash.height = -1;
+                    return trash;
+                }
                 return current;
             } else if (comparison <= 0) {
                 return search_by_name(file, current.left, key);
@@ -778,6 +839,11 @@ public:
         if constexpr (std::is_same<Record, MovieRecord>::value) {
             cmp2 = key == current.record.id;
             if (cmp2) {
+                if (current.deleted != 0) {
+                    RecordMetaData<Record> trash{};
+                    trash.height = -1;
+                    return trash;
+                }
                 return current;
             } else if (comparison <= 0) {
                 return search_by_name(file, current.left, key);
@@ -823,11 +889,12 @@ public:
             cmp_right = compare<Record>(right_name, current.record.id);
 
         }
-        if (cmp_left >= 0 && cmp_right <= 0) {
-            records.push_back(current.record);
-        }
+
         if (current.left != -1 && cmp_left > 0) {
             search_by_name_range(file, records, current.left, left_name, right_name);
+        }
+        if (cmp_left >= 0 && cmp_right <= 0) {
+            if (current.deleted == 0) records.push_back(current.record);
         }
         if (current.right != -1 && cmp_right < 0) {
             search_by_name_range(file, records, current.right, left_name, right_name);
